@@ -345,6 +345,7 @@ else:
         "LTX2LatentUpsamplePipeline",
     ]
     _import_structure["joyimage"] = ["JoyImageEditPipeline", "JoyImageEditPipelineOutput"]
+    _import_structure["joyvideo"] = ["JoyVideoPipeline", "JoyVideoPipelineOutput"]
     _import_structure["lumina"] = ["LuminaPipeline", "LuminaText2ImgPipeline"]
     _import_structure["lumina2"] = ["Lumina2Pipeline", "Lumina2Text2ImgPipeline"]
     _import_structure["lucy"] = ["LucyEditPipeline"]
@@ -758,6 +759,7 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
         from .hunyuandit import HunyuanDiTPipeline
         from .ideogram4 import Ideogram4Pipeline, Ideogram4PromptEnhancerHead
         from .joyimage import JoyImageEditPipeline, JoyImageEditPipelineOutput
+        from .joyvideo import JoyVideoPipeline, JoyVideoPipelineOutput
         from .kandinsky import (
             KandinskyCombinedPipeline,
             KandinskyImg2ImgCombinedPipeline,
