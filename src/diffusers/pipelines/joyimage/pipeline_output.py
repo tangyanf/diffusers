@@ -14,3 +14,12 @@ class JoyImageEditPipelineOutput(BaseOutput):
     """
 
     images: Union[List[PIL.Image.Image], np.ndarray]
+
+
+@dataclass
+class JoyImagePipelineOutput(BaseOutput):
+    """
+    Output class for JoyImage text-to-image generation pipelines.
+    """
+
+    images: Union[List[PIL.Image.Image], np.ndarray]

@@ -22,8 +22,9 @@ except OptionalDependencyNotAvailable:
     _dummy_objects.update(get_objects_from_module(dummy_torch_and_transformers_objects))
 else:
     _import_structure["pipeline_joyimage_edit"] = ["JoyImageEditPipeline"]
+    _import_structure["pipeline_joyimage"] = ["JoyImageDMDPipeline", "JoyImagePipeline"]
 
-    _import_structure["pipeline_output"] = ["JoyImageEditPipelineOutput"]
+    _import_structure["pipeline_output"] = ["JoyImageEditPipelineOutput", "JoyImagePipelineOutput"]
 
 if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
     try:
@@ -34,7 +35,8 @@ if TYPE_CHECKING or DIFFUSERS_SLOW_IMPORT:
         from ...utils.dummy_torch_and_transformers_objects import *
     else:
         from .pipeline_joyimage_edit import JoyImageEditPipeline
-        from .pipeline_output import JoyImageEditPipelineOutput
+        from .pipeline_joyimage import JoyImageDMDPipeline, JoyImagePipeline
+        from .pipeline_output import JoyImageEditPipelineOutput, JoyImagePipelineOutput
 else:
     import sys
 

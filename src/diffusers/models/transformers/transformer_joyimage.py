@@ -601,3 +601,9 @@ class JoyImageEditTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin):
         if not return_dict:
             return (img,)
         return Transformer2DModelOutput(sample=img)
+
+
+# T2I uses the exact same architecture and weights as Edit; the multi-item
+# path in forward() is only activated when hidden_states.ndim == 6, so a
+# standard 5-D input (B, C, T, H, W) works without modification.
+JoyImageTransformer3DModel = JoyImageEditTransformer3DModel
