@@ -149,7 +149,6 @@ class JoyImageEditPlusAttnProcessor:
         return img_attn_output, txt_attn_output
 
 
-# Copied from diffusers.models.transformers.transformer_joyimage.JoyImageAttention with JoyImage->JoyImageEditPlus
 class JoyImageEditPlusAttention(nn.Module, AttentionModuleMixin):
     """Joint attention module for JoyImage Edit Plus double-stream blocks."""
 
@@ -199,7 +198,6 @@ class JoyImageEditPlusAttention(nn.Module, AttentionModuleMixin):
         return self.processor(self, hidden_states, encoder_hidden_states, image_rotary_emb, **kwargs)
 
 
-# Copied from diffusers.models.transformers.transformer_joyimage.JoyImageTransformerBlock with JoyImage->JoyImageEditPlus
 class JoyImageEditPlusTransformerBlock(nn.Module):
     """Double-stream transformer block for JoyImage Edit Plus."""
 
