@@ -1485,7 +1485,7 @@ class Ideogram4Transformer2DModel(metaclass=DummyObject):
         requires_backends(cls, ["torch"])
 
 
-class JoyImageEditTransformer3DModel(metaclass=DummyObject):
+class JoyImageEditPlusTransformer3DModel(metaclass=DummyObject):
     _backends = ["torch"]
 
     def __init__(self, *args, **kwargs):
@@ -1500,7 +1500,7 @@ class JoyImageEditTransformer3DModel(metaclass=DummyObject):
         requires_backends(cls, ["torch"])
 
 
-class JoyImageEditPlusTransformer3DModel(metaclass=DummyObject):
+class JoyImageEditTransformer3DModel(metaclass=DummyObject):
     _backends = ["torch"]
 
     def __init__(self, *args, **kwargs):

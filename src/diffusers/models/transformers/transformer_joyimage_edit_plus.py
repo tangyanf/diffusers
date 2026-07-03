@@ -471,6 +471,10 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
             encoder_hidden_states_mask: [B, L] - attention mask for text tokens.
             shape_list: Per-sample list of (t, h, w) tuples for each component (target + references).
             return_dict: Whether to return a dict or tuple.
+
+        Returns:
+            If `return_dict` is True, an [`~models.modeling_outputs.Transformer2DModelOutput`] is returned, otherwise a
+            `tuple` where the first element is the sample tensor.
         """
         batch_size, max_num_patches, channels, pt, ph, pw = hidden_states.shape
         device = hidden_states.device
