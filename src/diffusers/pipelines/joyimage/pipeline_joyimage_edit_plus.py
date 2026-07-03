@@ -340,8 +340,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                     ref_tensor = torch.from_numpy(np.array(ref_img_pil.convert("RGB"))).to(device=device, dtype=dtype)
                     ref_tensor = (ref_tensor / 127.5 - 1.0).permute(2, 0, 1).unsqueeze(1).unsqueeze(0)
 
-                    with torch.autocast(device_type=device.type, dtype=torch.float32):
-                        ref_latent = self.vae.encode(ref_tensor.float()).latent_dist.mode()
+                    ref_latent = self.vae.encode(ref_tensor.to(self.vae.dtype)).latent_dist.mode()
                     ref_latent = ref_latent.to(dtype)
                     ref_latent = self.normalize_latents(ref_latent)
                     ref_latent = ref_latent.squeeze(0)  # [C, 1, H', W']
@@ -706,8 +705,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
                 video_latent = self.denormalize_latents(video_latent)
 
-                with torch.autocast(device_type=device.type, dtype=torch.float32):
-                    sample_image = self.vae.decode(video_latent.float(), return_dict=False)[0]
+                sample_image = self.vae.decode(video_latent.to(self.vae.dtype), return_dict=False)[0]
                 sample_image = (sample_image / 2 + 0.5).clamp(0, 1).squeeze(0).cpu().float()
                 image_list.append(sample_image)
 
