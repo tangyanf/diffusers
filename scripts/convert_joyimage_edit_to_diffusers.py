@@ -24,7 +24,6 @@ Usage:
 """
 
 import argparse
-from typing import Any, Dict, Tuple
 
 import torch
 from accelerate import init_empty_weights
@@ -248,8 +247,7 @@ def convert_transformer(ckpt_path: str, model_type: str = "edit"):
         remapped[new_key] = value
 
     transformer_cls = (
-        JoyImageEditPlusTransformer3DModel if model_type == "edit_plus"
-        else JoyImageEditTransformer3DModel
+        JoyImageEditPlusTransformer3DModel if model_type == "edit_plus" else JoyImageEditTransformer3DModel
     )
     with init_empty_weights():
         transformer = transformer_cls(**TRANSFORMER_CONFIG)
@@ -258,9 +256,7 @@ def convert_transformer(ckpt_path: str, model_type: str = "edit"):
 
 
 def get_args():
-    parser = argparse.ArgumentParser(
-        description="Convert JoyImage Edit / Edit Plus checkpoints to diffusers format"
-    )
+    parser = argparse.ArgumentParser(description="Convert JoyImage Edit / Edit Plus checkpoints to diffusers format")
     parser.add_argument(
         "--model_type",
         type=str,

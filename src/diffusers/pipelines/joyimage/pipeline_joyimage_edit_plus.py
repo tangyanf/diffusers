@@ -97,8 +97,8 @@ def retrieve_timesteps(
             `num_inference_steps` and `timesteps` must be `None`.
 
     Returns:
-        `tuple[torch.Tensor, int]`: A tuple where the first element is the timestep schedule from the scheduler and
-        the second element is the number of inference steps.
+        `tuple[torch.Tensor, int]`: A tuple where the first element is the timestep schedule from the scheduler and the
+        second element is the number of inference steps.
     """
     if timesteps is not None and sigmas is not None:
         raise ValueError("Only one of `timesteps` or `sigmas` can be passed.")
@@ -126,8 +126,8 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
     r"""
     Diffusion pipeline for multi-image instruction-guided editing using JoyImage Edit Plus.
 
-    Supports multiple reference images with different resolutions. Each reference image is independently
-    VAE-encoded and patchified, then concatenated with the target noise patches for joint denoising.
+    Supports multiple reference images with different resolutions. Each reference image is independently VAE-encoded
+    and patchified, then concatenated with the target noise patches for joint denoising.
 
     Args:
         scheduler ([`FlowMatchEulerDiscreteScheduler`]):
@@ -265,9 +265,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             return x[:, -target_length:]
         padding_length = target_length - current_length
         if x.ndim >= 3:
-            padding = torch.zeros(
-                (x.shape[0], padding_length, *x.shape[2:]), dtype=x.dtype, device=x.device
-            )
+            padding = torch.zeros((x.shape[0], padding_length, *x.shape[2:]), dtype=x.dtype, device=x.device)
         else:
             padding = torch.zeros((x.shape[0], padding_length), dtype=x.dtype, device=x.device)
         return torch.cat([x, padding], dim=1)
@@ -312,8 +310,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
         """Prepare 6D padded latent tensor with target noise + reference image latents.
 
         Returns:
-            padded_latents: [B, max_patches, C, pt, ph, pw]
-            target_mask: [B, max_patches] (True for target patches)
+            padded_latents: [B, max_patches, C, pt, ph, pw] target_mask: [B, max_patches] (True for target patches)
             shape_list: per-sample list of (t, h, w) tuples for each component
         """
         pt, ph, pw = self.transformer.config.patch_size
@@ -432,7 +429,10 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
         negative_prompt_embeds_mask: torch.Tensor | None = None,
         output_type: str | None = "pil",
         return_dict: bool = True,
-        callback_on_step_end: Callable[[int, int, dict], None] | PipelineCallback | MultiPipelineCallbacks | None = None,
+        callback_on_step_end: Callable[[int, int, dict], None]
+        | PipelineCallback
+        | MultiPipelineCallbacks
+        | None = None,
         callback_on_step_end_tensor_inputs: list[str] = ["latents"],
         max_sequence_length: int = 4096,
     ):
@@ -458,11 +458,11 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             sigmas (`list[float]`, *optional*):
                 Custom sigmas to use for the denoising process.
             guidance_scale (`float`, *optional*, defaults to `4.0`):
-                Classifier-free guidance scale. Higher values encourage the model to generate images more aligned
-                with the `prompt` at the expense of lower image quality.
+                Classifier-free guidance scale. Higher values encourage the model to generate images more aligned with
+                the `prompt` at the expense of lower image quality.
             negative_prompt (`str` or `list[str]`, *optional*):
-                The prompt or prompts not to guide the image generation. If not defined, a blank prompt is used
-                for classifier-free guidance.
+                The prompt or prompts not to guide the image generation. If not defined, a blank prompt is used for
+                classifier-free guidance.
             generator (`torch.Generator` or `list[torch.Generator]`, *optional*):
                 One or a list of [torch generator(s)](https://pytorch.org/docs/stable/generated/torch.Generator.html)
                 to make generation deterministic.
@@ -482,8 +482,8 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`JoyImageEditPlusPipelineOutput`] instead of a plain tuple.
             callback_on_step_end (`Callable`, *optional*):
-                A function called at the end of each denoising step with arguments: the pipeline, step index,
-                timestep, and a dict of callback tensor inputs.
+                A function called at the end of each denoising step with arguments: the pipeline, step index, timestep,
+                and a dict of callback tensor inputs.
             callback_on_step_end_tensor_inputs (`list[str]`, *optional*, defaults to `["latents"]`):
                 The list of tensor inputs for the `callback_on_step_end` function.
             max_sequence_length (`int`, *optional*, defaults to `4096`):
@@ -590,15 +590,19 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
             # Pad and concatenate [negative, positive]
             max_seq_len = max(prompt_embeds.shape[1], negative_prompt_embeds.shape[1])
-            prompt_embeds = torch.cat([
-                self._pad_sequence(negative_prompt_embeds, max_seq_len),
-                self._pad_sequence(prompt_embeds, max_seq_len),
-            ])
+            prompt_embeds = torch.cat(
+                [
+                    self._pad_sequence(negative_prompt_embeds, max_seq_len),
+                    self._pad_sequence(prompt_embeds, max_seq_len),
+                ]
+            )
             if prompt_embeds_mask is not None and negative_prompt_embeds_mask is not None:
-                prompt_embeds_mask = torch.cat([
-                    self._pad_sequence(negative_prompt_embeds_mask, max_seq_len),
-                    self._pad_sequence(prompt_embeds_mask, max_seq_len),
-                ])
+                prompt_embeds_mask = torch.cat(
+                    [
+                        self._pad_sequence(negative_prompt_embeds_mask, max_seq_len),
+                        self._pad_sequence(prompt_embeds_mask, max_seq_len),
+                    ]
+                )
 
         # Prepare timesteps
         timesteps, num_inference_steps = retrieve_timesteps(
@@ -697,7 +701,9 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                 target_patches = padded_latents[b_idx, :target_len]
                 c_lat = target_patches.shape[1]
                 video_latent = target_patches.reshape(l_t, l_h, l_w, c_lat, pt, ph, pw)
-                video_latent = video_latent.permute(3, 0, 4, 1, 5, 2, 6).reshape(1, c_lat, l_t * pt, l_h * ph, l_w * pw)
+                video_latent = video_latent.permute(3, 0, 4, 1, 5, 2, 6).reshape(
+                    1, c_lat, l_t * pt, l_h * ph, l_w * pw
+                )
 
                 video_latent = self.denormalize_latents(video_latent)
 

@@ -327,8 +327,8 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
     r"""
     JoyImage Edit Plus Transformer for multi-image editing.
 
-    Uses a patchify+padding approach where each reference image and the target noise are independently
-    patchified and concatenated into a flat patch sequence. Supports variable-resolution reference images.
+    Uses a patchify+padding approach where each reference image and the target noise are independently patchified and
+    concatenated into a flat patch sequence. Supports variable-resolution reference images.
 
     Input format: `[B, max_patches, C, pt, ph, pw]` (6D padded patches).
 
@@ -541,9 +541,9 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
 
         # 6. Output projection + reshape to 6D patches
         img = self.proj_out(self.norm_out(img))
-        img = img.reshape(
-            batch_size, max_num_patches, pt, ph, pw, self.out_channels
-        ).permute(0, 1, 5, 2, 3, 4)  # -> [B, N, C, pt, ph, pw]
+        img = img.reshape(batch_size, max_num_patches, pt, ph, pw, self.out_channels).permute(
+            0, 1, 5, 2, 3, 4
+        )  # -> [B, N, C, pt, ph, pw]
 
         if not return_dict:
             return (img,)
