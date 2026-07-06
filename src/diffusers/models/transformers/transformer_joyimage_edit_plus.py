@@ -116,11 +116,7 @@ class JoyImageEditPlusAttnProcessor:
         txt_key = attn.txt_attn_k_norm(txt_key)
 
         if image_rotary_emb is not None:
-            vis_freqs, txt_freqs = image_rotary_emb
-            if vis_freqs is not None:
-                img_query, img_key = _apply_rotary_emb_batched(img_query, img_key, vis_freqs)
-            if txt_freqs is not None:
-                txt_query, txt_key = _apply_rotary_emb_batched(txt_query, txt_key, txt_freqs)
+            img_query, img_key = _apply_rotary_emb_batched(img_query, img_key, image_rotary_emb)
 
         joint_query = torch.cat([img_query, txt_query], dim=1)
         joint_key = torch.cat([img_key, txt_key], dim=1)
@@ -369,7 +365,7 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
     @register_to_config
     def __init__(
         self,
-        patch_size: list = [1, 2, 2],
+        patch_size: list[int] = [1, 2, 2],
         in_channels: int = 16,
         out_channels: int | None = None,
         hidden_size: int = 3072,
@@ -384,12 +380,6 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
         super().__init__()
 
         self.out_channels = out_channels or in_channels
-        self.patch_size = patch_size
-        self.hidden_size = hidden_size
-        self.num_attention_heads = num_attention_heads
-        self.rope_dim_list = rope_dim_list
-        self.rope_type = rope_type
-        self.theta = theta
 
         attention_head_dim = hidden_size // num_attention_heads
         if hidden_size % num_attention_heads != 0:
@@ -433,8 +423,8 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
         stop: tuple[int, int, int],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate 3D RoPE for a spatial range [start, stop)."""
-        head_dim = self.hidden_size // self.num_attention_heads
-        rope_dim_list = self.rope_dim_list
+        head_dim = self.config.hidden_size // self.config.num_attention_heads
+        rope_dim_list = self.config.rope_dim_list
         if rope_dim_list is None:
             rope_dim_list = [head_dim // 3] * 3
 
@@ -447,7 +437,7 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
         cos_parts, sin_parts = [], []
         for i, dim in enumerate(rope_dim_list):
             pos = mesh[i].reshape(-1)
-            freqs = 1.0 / (self.theta ** (torch.arange(0, dim, 2, dtype=torch.float32)[: (dim // 2)] / dim))
+            freqs = 1.0 / (self.config.theta ** (torch.arange(0, dim, 2, dtype=torch.float32)[: (dim // 2)] / dim))
             angles = torch.outer(pos, freqs)
             cos_parts.append(angles.cos().repeat_interleave(2, dim=1))
             sin_parts.append(angles.sin().repeat_interleave(2, dim=1))
@@ -531,13 +521,13 @@ class JoyImageEditPlusTransformer3DModel(ModelMixin, ConfigMixin, AttentionMixin
         # 5. Run double blocks
         for block in self.double_blocks:
             if torch.is_grad_enabled() and self.gradient_checkpointing:
-                img, txt = self._gradient_checkpointing_func(block, img, txt, vec, (vis_freqs, None), attention_mask)
+                img, txt = self._gradient_checkpointing_func(block, img, txt, vec, vis_freqs, attention_mask)
             else:
                 img, txt = block(
                     hidden_states=img,
                     encoder_hidden_states=txt,
                     temb=vec,
-                    image_rotary_emb=(vis_freqs, None),
+                    image_rotary_emb=vis_freqs,
                     attention_mask=attention_mask,
                 )
 

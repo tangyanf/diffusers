@@ -15,7 +15,6 @@
 import inspect
 from typing import Callable
 
-import numpy as np
 import torch
 from PIL import Image
 from transformers import (
@@ -25,7 +24,6 @@ from transformers import (
 )
 
 from ...callbacks import MultiPipelineCallbacks, PipelineCallback
-from ...image_processor import VaeImageProcessor
 from ...models import AutoencoderKLWan
 from ...models.transformers.transformer_joyimage_edit_plus import JoyImageEditPlusTransformer3DModel
 from ...schedulers import FlowMatchEulerDiscreteScheduler
@@ -172,10 +170,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
         self.vae_scale_factor_temporal = self.vae.config.scale_factor_temporal if getattr(self, "vae", None) else 4
         self.vae_scale_factor_spatial = self.vae.config.scale_factor_spatial if getattr(self, "vae", None) else 8
-        self.image_processor = VaeImageProcessor(vae_scale_factor=self.vae_scale_factor_spatial)
-        self.vae_image_processor = JoyImageEditImageProcessor(
-            vae_scale_factor=self.vae_scale_factor_spatial,
-        )
+        self.image_processor = JoyImageEditImageProcessor(vae_scale_factor=self.vae_scale_factor_spatial)
 
         self.prompt_template_encode = {
             "multiple_images": (
@@ -269,32 +264,6 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             padding = torch.zeros((x.shape[0], padding_length), dtype=x.dtype, device=x.device)
         return torch.cat([x, padding], dim=1)
 
-    def normalize_latents(self, latent: torch.Tensor) -> torch.Tensor:
-        if hasattr(self.vae.config, "latents_mean") and hasattr(self.vae.config, "latents_std"):
-            latents_mean = (
-                torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latent.device, latent.dtype)
-            )
-            latents_std = (
-                torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(latent.device, latent.dtype)
-            )
-            latent = (latent - latents_mean) / latents_std
-        else:
-            latent = latent * self.vae.config.scaling_factor
-        return latent
-
-    def denormalize_latents(self, latent: torch.Tensor) -> torch.Tensor:
-        if hasattr(self.vae.config, "latents_mean") and hasattr(self.vae.config, "latents_std"):
-            latents_mean = (
-                torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latent.device, latent.dtype)
-            )
-            latents_std = (
-                torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(latent.device, latent.dtype)
-            )
-            latent = latent * latents_std + latents_mean
-        else:
-            latent = latent / self.vae.config.scaling_factor
-        return latent
-
     def prepare_latents(
         self,
         batch_size: int,
@@ -305,8 +274,13 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
         device: torch.device,
         generator: torch.Generator | list[torch.Generator] | None,
         reference_images: list[list[Image.Image]] | None = None,
+        latents: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, list[list[tuple[int, int, int]]]]:
         """Prepare 6D padded latent tensor with target noise + reference image latents.
+
+        Args:
+            latents: Optional pre-computed noise for the target slot. Shape ``(B, C, 1, H', W')`` where
+                ``H'`` and ``W'`` are the latent-space dimensions. When ``None``, random noise is sampled.
 
         Returns:
             padded_latents: [B, max_patches, C, pt, ph, pw] target_mask: [B, max_patches] (True for target patches)
@@ -326,23 +300,25 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             t_target = 1
             h_target = int(height) // self.vae_scale_factor_spatial
             w_target = int(width) // self.vae_scale_factor_spatial
-            noise_shape = (num_channels_latents, t_target, h_target, w_target)
-            noise_block = randn_tensor(noise_shape, generator=sample_gen, device=device, dtype=dtype)
+            if latents is None:
+                noise_shape = (num_channels_latents, t_target, h_target, w_target)
+                noise_block = randn_tensor(noise_shape, generator=sample_gen, device=device, dtype=dtype)
+            else:
+                noise_block = latents[i].to(device=device, dtype=dtype)
 
             sample_items = [noise_block]
 
             # Reference images
             if reference_images is not None and reference_images[i]:
                 for ref_img_pil in reference_images[i]:
-                    ref_h, ref_w = self.vae_image_processor.get_default_height_width(ref_img_pil)
-                    ref_img_pil = self.vae_image_processor.resize_center_crop(ref_img_pil, (ref_h, ref_w))
-
-                    ref_tensor = torch.from_numpy(np.array(ref_img_pil.convert("RGB"))).to(device=device, dtype=dtype)
-                    ref_tensor = (ref_tensor / 127.5 - 1.0).permute(2, 0, 1).unsqueeze(1).unsqueeze(0)
+                    ref_tensor = self.image_processor.preprocess(ref_img_pil).to(device=device, dtype=dtype)
+                    ref_tensor = ref_tensor.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
 
                     ref_latent = self.vae.encode(ref_tensor.to(self.vae.dtype)).latent_dist.mode()
                     ref_latent = ref_latent.to(dtype)
-                    ref_latent = self.normalize_latents(ref_latent)
+                    latents_mean = torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(ref_latent.device, ref_latent.dtype)
+                    latents_std = torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(ref_latent.device, ref_latent.dtype)
+                    ref_latent = (ref_latent - latents_mean) / latents_std
                     ref_latent = ref_latent.squeeze(0)  # [C, 1, H', W']
                     sample_items.append(ref_latent)
 
@@ -513,7 +489,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
         if height is None or width is None:
             if images is not None and len(images[0]) > 0:
                 last_img = images[0][-1]
-                height, width = self.vae_image_processor.get_default_height_width(last_img)
+                height, width = self.image_processor.get_default_height_width(last_img)
             else:
                 height = height or 1024
                 width = width or 1024
@@ -526,8 +502,8 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             for sample_imgs in images:
                 processed_sample = []
                 for img in sample_imgs:
-                    ref_h, ref_w = self.vae_image_processor.get_default_height_width(img)
-                    resize_img = self.vae_image_processor.resize_center_crop(img, (ref_h, ref_w))
+                    ref_h, ref_w = self.image_processor.get_default_height_width(img)
+                    resize_img = self.image_processor.resize_center_crop(img, (ref_h, ref_w))
                     processed_sample.append(resize_img)
                 processed_images.append(processed_sample)
             images = processed_images
@@ -609,7 +585,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
         # Prepare latents (patchified)
         num_channels_latents = self.transformer.config.in_channels
-        padded_latents, target_mask, shape_list = self.prepare_latents(
+        latents, target_mask, shape_list = self.prepare_latents(
             batch_size=batch_size,
             num_channels_latents=num_channels_latents,
             height=height,
@@ -618,17 +594,13 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
             device=device,
             generator=generator,
             reference_images=images,
+            latents=latents,
         )
-
-        # Zero out padding text tokens to prevent them from corrupting attention
-        # (original uses explicit attention masking; here we neutralize padding values)
-        if prompt_embeds_mask is not None:
-            prompt_embeds = prompt_embeds * prompt_embeds_mask.unsqueeze(-1)
 
         # Denoising loop
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
-        clean_reference_backup = padded_latents.clone()
+        clean_reference_backup = latents.clone()
 
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
@@ -636,9 +608,9 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                     continue
 
                 # Restore reference patches
-                padded_latents[~target_mask] = clean_reference_backup[~target_mask]
+                latents[~target_mask] = clean_reference_backup[~target_mask]
 
-                model_input = padded_latents
+                model_input = latents
 
                 # CFG expansion
                 if self.do_classifier_free_guidance:
@@ -669,17 +641,16 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                     noise_pred = comb_pred * (cond_norm / noise_norm)
 
                 # Scheduler step
-                padded_latents = self.scheduler.step(noise_pred, t, padded_latents, return_dict=False)[0].to(
+                latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0].to(
                     dtype=prompt_embeds.dtype
                 )
 
                 if callback_on_step_end is not None:
-                    latents = padded_latents
                     callback_kwargs = {}
                     for k in callback_on_step_end_tensor_inputs:
                         callback_kwargs[k] = locals()[k]
                     callback_outputs = callback_on_step_end(self, i, t, callback_kwargs)
-                    padded_latents = callback_outputs.pop("latents", padded_latents)
+                    latents = callback_outputs.pop("latents", latents)
                     prompt_embeds = callback_outputs.pop("prompt_embeds", prompt_embeds)
 
                 if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
@@ -688,7 +659,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
         # Post-processing: decode target latents
         if output_type != "latent":
-            padded_latents[~target_mask] = clean_reference_backup[~target_mask]
+            latents[~target_mask] = clean_reference_backup[~target_mask]
             pt, ph, pw = self.transformer.config.patch_size
 
             image_list = []
@@ -696,43 +667,30 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                 l_t, l_h, l_w = shape_list[b_idx][0]
                 target_len = l_t * l_h * l_w
 
-                target_patches = padded_latents[b_idx, :target_len]
+                target_patches = latents[b_idx, :target_len]
                 c_lat = target_patches.shape[1]
                 video_latent = target_patches.reshape(l_t, l_h, l_w, c_lat, pt, ph, pw)
                 video_latent = video_latent.permute(3, 0, 4, 1, 5, 2, 6).reshape(
                     1, c_lat, l_t * pt, l_h * ph, l_w * pw
                 )
 
-                video_latent = self.denormalize_latents(video_latent)
+                latents_mean = torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(video_latent.device, video_latent.dtype)
+                latents_std = torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(video_latent.device, video_latent.dtype)
+                video_latent = video_latent * latents_std + latents_mean
 
                 sample_image = self.vae.decode(video_latent.to(self.vae.dtype), return_dict=False)[0]
-                sample_image = (sample_image / 2 + 0.5).clamp(0, 1).squeeze(0).cpu().float()
+                # [1, C, T=1, H, W] -> [C, H, W]
+                sample_image = sample_image.float().squeeze(0).squeeze(1)
                 image_list.append(sample_image)
 
-            # Convert to output format
-            output_images = []
-            for img_tensor in image_list:
-                # img_tensor: [C, T, H, W] -> [C, H, W] (T=1)
-                img_tensor = img_tensor[:, 0]
-                if output_type == "pil":
-                    img_np = (img_tensor.permute(1, 2, 0).cpu().float().numpy() * 255).clip(0, 255).astype(np.uint8)
-                    output_images.append(Image.fromarray(img_np))
-                elif output_type == "np":
-                    img_np = (img_tensor.permute(1, 2, 0).cpu().float().numpy() * 255).clip(0, 255).astype(np.uint8)
-                    output_images.append(img_np)
-                else:
-                    output_images.append(img_tensor)
-
-            if output_type == "pt":
-                image = torch.stack(output_images)
-            else:
-                image = output_images
+            image = torch.stack(image_list)  # [B, C, H, W]
+            image = self.image_processor.postprocess(image, output_type=output_type)
         else:
-            image = padded_latents
+            image = latents
 
         self.maybe_free_model_hooks()
 
         if not return_dict:
-            return image
+            return (image,)
 
         return JoyImageEditPlusPipelineOutput(images=image)
