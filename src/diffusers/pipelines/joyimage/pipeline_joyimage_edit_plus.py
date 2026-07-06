@@ -638,7 +638,7 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                     comb_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
                     cond_norm = torch.norm(noise_pred_text, dim=2, keepdim=True)
                     noise_norm = torch.norm(comb_pred, dim=2, keepdim=True)
-                    noise_pred = comb_pred * (cond_norm / noise_norm)
+                    noise_pred = comb_pred * (cond_norm / noise_norm.clamp_min(1e-6))
 
                 # Scheduler step
                 latents = self.scheduler.step(noise_pred, t, latents, return_dict=False)[0].to(
