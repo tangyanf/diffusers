@@ -80,9 +80,6 @@ class JoyImageEditPlusAttnProcessor:
     _attention_backend = None
     _parallel_config = None
 
-    def __init__(self):
-        pass
-
     def __call__(
         self,
         attn: "JoyImageEditPlusAttention",

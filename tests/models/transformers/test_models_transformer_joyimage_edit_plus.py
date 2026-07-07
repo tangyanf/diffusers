@@ -91,9 +91,7 @@ class JoyImageEditPlusTransformerTesterConfig(BaseModelTesterConfig):
 
 
 class TestJoyImageEditPlusTransformer(JoyImageEditPlusTransformerTesterConfig, ModelTesterMixin):
-    @pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16], ids=["fp16", "bf16"])
-    def test_from_save_pretrained_dtype_inference(self, tmp_path, dtype):
-        pytest.skip("Tolerance requirements too high for meaningful test")
+    pass
 
 
 class TestJoyImageEditPlusTransformerMemory(JoyImageEditPlusTransformerTesterConfig, MemoryTesterMixin):
