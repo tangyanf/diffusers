@@ -316,8 +316,16 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
 
                     ref_latent = self.vae.encode(ref_tensor.to(self.vae.dtype)).latent_dist.mode()
                     ref_latent = ref_latent.to(dtype)
-                    latents_mean = torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(ref_latent.device, ref_latent.dtype)
-                    latents_std = torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(ref_latent.device, ref_latent.dtype)
+                    latents_mean = (
+                        torch.tensor(self.vae.config.latents_mean)
+                        .view(1, -1, 1, 1, 1)
+                        .to(ref_latent.device, ref_latent.dtype)
+                    )
+                    latents_std = (
+                        torch.tensor(self.vae.config.latents_std)
+                        .view(1, -1, 1, 1, 1)
+                        .to(ref_latent.device, ref_latent.dtype)
+                    )
                     ref_latent = (ref_latent - latents_mean) / latents_std
                     ref_latent = ref_latent.squeeze(0)  # [C, 1, H', W']
                     sample_items.append(ref_latent)
@@ -674,8 +682,16 @@ class JoyImageEditPlusPipeline(DiffusionPipeline):
                     1, c_lat, l_t * pt, l_h * ph, l_w * pw
                 )
 
-                latents_mean = torch.tensor(self.vae.config.latents_mean).view(1, -1, 1, 1, 1).to(video_latent.device, video_latent.dtype)
-                latents_std = torch.tensor(self.vae.config.latents_std).view(1, -1, 1, 1, 1).to(video_latent.device, video_latent.dtype)
+                latents_mean = (
+                    torch.tensor(self.vae.config.latents_mean)
+                    .view(1, -1, 1, 1, 1)
+                    .to(video_latent.device, video_latent.dtype)
+                )
+                latents_std = (
+                    torch.tensor(self.vae.config.latents_std)
+                    .view(1, -1, 1, 1, 1)
+                    .to(video_latent.device, video_latent.dtype)
+                )
                 video_latent = video_latent * latents_std + latents_mean
 
                 sample_image = self.vae.decode(video_latent.to(self.vae.dtype), return_dict=False)[0]
